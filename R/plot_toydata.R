@@ -20,7 +20,7 @@ plot_toydata <- function(dat, col = viridis::viridis(2, alpha = 0.7)[1], pch = 1
     bty = "n",
     xlab = "Var 1",
     ylab = "Var 2",
-    main = paste0("Toydata with ", nrow(toydata), " observations."),
+    main = paste0("Toydata with ", nrow(dat), " observations."),
     las = 1,
     ...
   )
