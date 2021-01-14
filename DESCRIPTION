@@ -12,6 +12,7 @@ Depends:
     R (>= 4.0.0)
 Imports:
     torch (>= 0.2.1)
+    mice
 Suggests:
     covr,
     knitr,

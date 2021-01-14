@@ -297,3 +297,146 @@ pre_process_missing_data <- function(D, tau = 0) {
   D[is.na(D)] <- tau
   return(list(D = D, M = M))
 }
+
+
+analyze_mi <- function(mi_list, analysis_model) {
+  require(dplyr)
+  if (length(mi_list) < 2) {
+    mi_list <- list(mi_list[[1]], mi_list[[1]])
+  }
+  res <- lapply(mi_list, function(x)
+    analysis_model(x)) %>%
+    mice::pool(.) %>%
+    summary(., "all", conf.int = T) %>%
+    .[1:nrow(.), c("estimate", "2.5 %", "97.5 %")] %>%
+    as.matrix()
+
+  return(res)
+}
+
+
+an <- . %>%
+  lapply(function(x)
+    analysis_model(x)) %>%
+  mice::pool(.) %>%
+  summary(., "all", conf.int = T) %>%
+  .[1:nrow(.), c("estimate", "2.5 %", "97.5 %")] %>%
+  as.matrix()
+
+
+an_single <- . %>%
+  list(., .) %>%
+  lapply(function(x)
+    analysis_model(x)) %>%
+  mice::pool(.) %>%
+  summary(., "all", conf.int = T) %>%
+  .[1:nrow(.), c("estimate", "2.5 %", "97.5 %")] %>%
+  as.matrix()
+
+
+summarize_mi_analysis <-
+  function(res, imp, analysis_model, true_values) {
+    nsim <- length(res)
+
+    tmp <-
+      lapply(1:nsim, function(x)
+        analyze_mi(res[[x]][[paste0(imp)]], analysis_model))
+    tmp <- do.call(abind::abind, c(tmp, along = 3))
+
+    RB <- rowMeans(tmp[, "estimate",]) - true_values
+    PB <-
+      100 * abs((rowMeans(tmp[, "estimate",]) - true_values) / true_values)
+    CR <-
+      rowMeans(tmp[, "2.5 %",] < replicate(nsim, true_values) &
+                 replicate(nsim, true_values) < tmp[, "97.5 %",])
+    AW <- rowMeans(tmp[, "97.5 %",] - tmp[, "2.5 %",])
+    RMSE <-
+      sqrt(rowMeans((tmp[, "estimate",] - replicate(nsim, true_values)) ^ 2))
+    data.frame(RB, PB, CR, AW, RMSE)
+  }
+
+
+
+dgp_fct <-
+  function(n_data = 500,
+           dgp_name = "amelia",
+           missingness = "mcar1",
+           seed = NULL,
+           ...) {
+    if (!is.null(seed)) {
+      set.seed(seed)
+    }
+
+    if (!exists(".Random.seed"))
+      set.seed(NULL)
+
+
+    if (dgp_name == "amelia") {
+      data_list <- amelia_data(n_data, missingness)
+    } else if (dgp_name == "hd") {
+      data_list <- hd_data(n_data, missingness)
+    } else if (dgp_name == "mixed") {
+      data_list <- mixed_data(n_data, missingness)
+      colnames(data_list$D) <- NULL
+    } else if (dgp_name == "tbm") {
+      data_list <- tbm_data(n_data, missingness,...)
+    } else {
+      stop("The data generating process you selected is not yet implemented...")
+    }
+    names(data_list) <- c("D_full", "D")
+    class(data_list) <- "mi_experiment"
+    attr(data_list, "n_data") <- n_data
+    attr(data_list, "dgp_name") <- dgp_name
+    attr(data_list, "missingness") <- missingness
+    attr(data_list, "seed") <- seed
+    return(data_list)
+  }
+
+
+MICycle_pre_process <-
+  function(data_list,
+           discrete_columns = NULL,
+           cluster_columns = NULL,
+           transformer = NULL) {
+    # Set NA to tau and generate M
+    if (!is.null(discrete_columns)) {
+      discrete_columns <- as.list(discrete_columns - 1)
+    } else {
+      discrete_columns <- list()
+    }
+    if (!is.null(cluster_columns)) {
+      cluster_columns <- as.list(cluster_columns - 1)
+    } else {
+      cluster_columns <- list()
+    }
+
+    pre_proc_list <-  pre_process_missing_data(data_list$D)
+
+    if(is.null(transformer)){
+      transformer_a <- DataTransformer$new()
+
+      transformer_a$fit(pre_proc_list$D,
+                        discrete_columns = discrete_columns)
+    } else {
+      transformer_a <- transformer
+    }
+    train_data <- transformer_a$transform(pre_proc_list$D)
+
+    train_mask <- match_mask(pre_proc_list$M, transformer_a)
+
+
+    torch_data <- torch::torch_tensor(train_data)
+    torch_mask <-torch::torch_tensor(train_mask)
+
+    return(
+      list(
+        transformer = transformer_a,
+        D = pre_proc_list$D,
+        train_data = train_data,
+        torch_data = torch_data,
+        M = pre_proc_list$M,
+        train_mask = train_mask,
+        torch_mask = torch_mask
+      )
+    )
+  }
