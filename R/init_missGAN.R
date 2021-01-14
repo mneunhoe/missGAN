@@ -329,7 +329,7 @@ GAN2_update_step <-
     }
 
     z_enc <- GAN_nets$encoder(real_data*real_mask)
-    z_gen <- torch::torch_empty_like(z_enc)$normal_()
+    z_gen <- torch::torch_empty_like(z_enc)$normal_()$to(device =device)
 
     x_gen <- apply_activate(GAN_nets$decoder(z_gen), GAN_nets$transformer)
     x_rec <- apply_activate(GAN_nets$decoder(z_enc), GAN_nets$transformer)
@@ -381,7 +381,7 @@ GAN2_update_step <-
     # To update the Generator we will use a fresh noise sample.
     # torch_randn creates a torch object filled with draws from a standard normal distribution
     z_enc <- GAN_nets$encoder(real_mask*real_data)
-    z_gen <- torch::torch_empty_like(z_enc)$normal_()
+    z_gen <- torch::torch_empty_like(z_enc)$normal_()$to(device = device)
 
     x_gen <- apply_activate(GAN_nets$decoder(z_gen), GAN_nets$transformer)
     x_rec <- apply_activate(GAN_nets$decoder(z_enc), GAN_nets$transformer)
@@ -392,7 +392,7 @@ GAN2_update_step <-
     z_rec <- GAN_nets$encoder(fake_mask*x_gen)
 
     start_idx <- 1
-    ae_loss <- torch::torch_zeros(1, requires_grad = T)
+    ae_loss <- torch::torch_zeros(1, requires_grad = T)$to(device = device)
 
     for(info in GAN_nets$transformer$output_info){
       i <- info[[1]]
