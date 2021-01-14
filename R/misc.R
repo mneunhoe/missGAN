@@ -1,3 +1,4 @@
+#' @importFrom magrittr "%>%"
 # Function to generate data according to King et al 2001
 
 tbm_data <-
