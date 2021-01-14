@@ -191,6 +191,14 @@ GAN_update_step <-
   }
 
 
+init_weights <- function(m){
+  if( "nn_linear" %in% attributes(m)$class){
+    torch::nn_init_kaiming_normal_(m$weight)
+    m$bias$data()$fill_(0.01)
+  }
+
+}
+
 init_missGAN2 <- function(dat, mask, transformer,
                          latent_dim = 2,
                          optimizer = "adam",
@@ -216,6 +224,8 @@ init_missGAN2 <- function(dat, mask, transformer,
       dropout_rate = encoder_dropout_rate
     )$to(device = device)
 
+  encoder$apply(init_weights)
+
   decoder <-
     Generator(
       noise_dim = latent_dim,
@@ -223,6 +233,8 @@ init_missGAN2 <- function(dat, mask, transformer,
       hidden_units = n_decoder,
       dropout_rate = decoder_dropout_rate
     )$to(device = device)
+
+  decoder$apply(init_weights)
 
   mask_decoder <-
     Generator(
@@ -232,15 +244,21 @@ init_missGAN2 <- function(dat, mask, transformer,
       dropout_rate = decoder_dropout_rate
     )$to(device = device)
 
+  mask_decoder$apply(init_weights)
+
   discriminator_d <-
     Discriminator(data_dim = data_dim,
                   hidden_units = ndf,
                   dropout_rate = D_dropout_rate,pack = pack)$to(device = device)
 
+  discriminator_d$apply(init_weights)
+
   discriminator_e <-
     Discriminator(data_dim = latent_dim,
                   hidden_units = ndf,
                   dropout_rate = D_dropout_rate, pack = pack)$to(device = device)
+
+  discriminator_e$apply(init_weights)
 
   # To update the parameters of the network we need setup an optimizer. Here we use the adam optimizer with a learning rate of 0.0002
   if(optimizer == "adam") {
