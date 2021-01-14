@@ -123,13 +123,13 @@ SpectralNorm <- torch::nn_module(
     v <- self$module$parameters[[paste0(self$name, "_v")]]
     w <- self$module$parameters[[paste0(self$name, "_bar")]]
 
-    height <- w$data$shape[1]
+    height <- w$data()$shape[1]
     for(i in 1:self$power_iterations) {
-      v$data <- l2normalize(torch::torch_mv(torch::torch_t(w$view(c(height, -1))$data()), u$data()))
-      u$data <- l2normalize(torch::torch_mv(w$view(c(height, -1))$data(), v$data()))
+      v <- l2normalize(torch::torch_mv(torch::torch_t(w$view(c(height, -1))$data()), u$data()))
+      u <- l2normalize(torch::torch_mv(w$view(c(height, -1))$data(), v$data()))
     }
     sigma <- u$dot(w$view(c(height, -1))$mv(v))
-    self$module$parameters[[paste0(self$name)]] <- w / sigma$expand_as(w)
+    self$module[[paste0(self$name)]] <- w / sigma$expand_as(w)
 
   },
   made_params = function() {
@@ -141,11 +141,11 @@ SpectralNorm <- torch::nn_module(
     height <- w$data()$shape[1]
     width <- w$view(c(height, -1))$data()$shape[1]
 
-    u <- torch::nn_parameter(torch::torch_randn(height), requires_grad = FALSE)
-    v <- torch::nn_parameter(torch::torch_randn(width), requires_grad = FALSE)
+    u <- torch::nn_parameter(l2normalize(torch::torch_randn(height)), requires_grad = FALSE)
+    v <- torch::nn_parameter(l2normalize(torch::torch_randn(width)), requires_grad = FALSE)
 
-    u <- l2normalize(u$data())
-    v <- l2normalize(v$data())
+    # u <- l2normalize(u$data())
+    # v <- l2normalize(v$data())
     w_bar <- torch::nn_parameter(w$data())
 
     self$module$register_parameter(paste0(self$name, "_u"), u)
