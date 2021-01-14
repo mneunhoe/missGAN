@@ -84,7 +84,7 @@ Discriminator <- torch::nn_module(
     # Now we loop over the list of hidden units and add the hidden layers to the nn_sequential module
     for (neurons in hidden_units) {
       # We start with a fully connected linear layer
-      self$seq$add_module(module = torch::nn_linear(dim, neurons),
+      self$seq$add_module(module = SpectralNorm(torch::nn_linear(dim, neurons)),
                           name = paste0("Linear_", i))
       # Add a leakyReLU activation
       self$seq$add_module(module = torch::nn_leaky_relu(),
@@ -98,7 +98,7 @@ Discriminator <- torch::nn_module(
       i <- i + 1
     }
     # Add an output layer to the net. Since it will be one score for each example we only need a dimension of 1.
-    self$seq$add_module(module = torch::nn_linear(dim, 1),
+    self$seq$add_module(module = SpectralNorm(torch::nn_linear(dim, 1)),
                         name = "Output")
 
   },
