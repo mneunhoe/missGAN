@@ -418,8 +418,8 @@ GAN2_update_step <-
         ae_loss <- ae_loss + GAN_nets$losses[[1]](x_rec[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1],
                                                   real_data[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1])
       } else if(info[[2]] == "softmax") {
-        ae_loss <- ae_loss + GAN_nets$losses[[3]](x_rec[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1],
-                                                  torch::torch_argmax(real_data[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1], dim = 2))
+        ae_loss <- ae_loss + GAN_nets$losses[[3]](x_rec[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1]$view(c(-1, i)),
+                                                  torch::torch_argmax(real_data[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1]$view(c(-1, i)), dim = 2))
       } else {
         ae_loss <- ae_loss + GAN_nets$losses[[4]](x_rec[,start_idx:(start_idx+i-1)],
                                                   real_data[,start_idx:(start_idx+i-1)])
