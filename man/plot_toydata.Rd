@@ -4,7 +4,7 @@
 \alias{plot_toydata}
 \title{plot_toydata}
 \usage{
-plot_toydata(dat, col = viridis::viridis(2, alpha = 0.7)[1])
+plot_toydata(dat, col = viridis::viridis(2, alpha = 0.7)[1], pch = 19, ...)
 }
 \arguments{
 \item{dat}{The number of observations in the produced toydata}

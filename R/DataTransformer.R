@@ -1,0 +1,145 @@
+#' @title DataTransformer
+#'
+#' @description Provides a class to transform data for missGAN
+#'
+#' @return A plot of the toydata
+#' @examples
+#' transformer <- DataTransformer$new()
+#' transformer$fit(data, discrete_columns = 1)
+#' transformed_data <- transformer$transform(data)
+#' retransformed_data <- transformer$inverse_transform(transformed_data)
+#' @export
+
+DataTransformer <- R6::R6Class(
+  "DataTransformer",
+  lock_objects = FALSE,
+  public = list(
+    initialize = function() {
+      NULL
+    },
+    fit_continuous = function(column = NULL, data = NULL) {
+      data <- data[, 1]
+      mean <- mean(data)
+      std <- sd(data)
+
+      return(
+        list(
+          name = column,
+          z_transform = NULL,
+          mean = mean,
+          std = std,
+          output_info = list(1, "linear"),
+          output_dimensions = 1
+        )
+      )
+    },
+    fit_discrete = function(column = NULL, data = NULL) {
+      column <- column
+      data <- factor(data[, 1])
+      levs <- levels(data)
+      categories <- length(levs)
+
+      return(
+        list(
+          name = column,
+          levs = levs,
+          output_info = list(categories, "softmax"),
+          output_dimensions = categories
+        )
+      )
+
+    },
+    fit = function(data, discrete_columns = NULL) {
+      self$output_info <- list()
+      self$output_dimensions <- 0
+
+      self$meta <- list()
+
+      if(is.null(colnames(data))){
+        col_ids <- 1:ncol(data)
+      } else {
+        col_ids <- colnames(data)
+      }
+
+      for(column in col_ids){
+        column_data <- data[, which(column == col_ids), drop = F]
+        if(column %in% discrete_columns){
+          meta <- self$fit_discrete(column, column_data)
+        } else {
+          meta <- self$fit_continuous(column, column_data)
+        }
+        self$output_info[[length(self$output_info)+1]] <- meta$output_info
+        self$ouput_dimensions <- self$output_dimensions + meta$output_dimensions
+        self$meta[[length(self$meta)+1]] <- meta
+      }
+      invisible(self)
+    },
+    transform_continuous = function(column_meta, data) {
+      mean <- column_meta$mean
+      std <- column_meta$std
+
+      z <- (data - mean) / std
+
+      return(z)
+    },
+    transform_discrete = function(column_meta, data) {
+
+      oh <- model.matrix(~0 + factor(data, levels = column_meta$levs))
+      colnames(oh) <- column_meta$levs
+      return(oh)
+    },
+    transform = function(data) {
+      values <- list()
+      for(meta in self$meta) {
+        column_data <- data[,meta$name]
+        if("levs" %in% names(meta)) {
+          values[[length(values)+1]] <- self$transform_discrete(meta, column_data)
+        } else {
+          values[[length(values)+1]] <- self$transform_continuous(meta, column_data)
+        }
+      }
+
+      return(do.call(cbind, values))
+
+    },
+    inverse_transform_continuous = function(meta, data) {
+      mean <- meta$mean
+      std <- meta$std
+
+      u <- data
+
+      column <- u * std + mean
+
+      return(column)
+    },
+    inverse_transform_discrete = function(meta, data) {
+      levs <- meta$levs
+      column <- factor(data %*% 1:length(levs))
+      levels(column) <- levs
+      column <- as.numeric(as.character(column))
+      return(column)
+    },
+    inverse_transform = function(data) {
+      start <- 1
+      output <- list()
+      column_names <- list()
+      for(meta in self$meta) {
+        dimensions <- meta$output_dimensions
+        columns_data <- data[,start:(start+dimensions-1)]
+
+        if("levs" %in% names(meta)) {
+          inverted <- self$inverse_transform_discrete(meta, columns_data)
+        } else {
+          inverted <- self$inverse_transform_continuous(meta, columns_data)
+        }
+        output[[length(output)+1]] <- inverted
+        column_names[[length(column_names)+1]] <- meta$name
+        start <- start + dimensions
+      }
+      output <- do.call("cbind", output)
+      colnames(output) <- do.call("c", column_names)
+
+      return(output)
+    }
+  )
+)

@@ -67,15 +67,17 @@ Generator <- torch::nn_module(
 Discriminator <- torch::nn_module(
   initialize = function(data_dim, # The number of columns in our data
                         hidden_units = list(128, 128), # A list with the number of neurons per layer. If you add more elements to the list you create a deeper network.
-                        dropout_rate = 0.5 # The dropout probability
+                        dropout_rate = 0.5, # The dropout probability
+                        pack = 1
   ) {
 
     # Initialize an empty nn_sequential module
     self$seq <- torch::nn_sequential()
 
     # For the hidden layers we need to keep track of our input and output dimensions. The first input will be our noise vector, therefore, it will be noise_dim
-    dim <- data_dim
-
+    dim <- data_dim * pack
+    self$pack <- pack
+    self$packdim <- dim
     # i will be a simple counter to keep track of our network depth
     i <- 1
 
@@ -101,7 +103,7 @@ Discriminator <- torch::nn_module(
 
   },
   forward = function(input) {
-    data <- self$seq(input)
+    data <- self$seq(input$view(c(-1, self$packdim)))
     data
   }
 )
@@ -133,3 +135,125 @@ kl_gen <- function(dis_fake) {
   loss = -torch::torch_mean(dis_fake)
   return(loss)
 }
+
+
+hinge_real <- function(dis_real){
+  loss_real <- torch::torch_mean(torch::nnf_relu(1. - dis_real))
+  return(loss_real)
+}
+
+
+
+hinge_fake <- function(dis_fake){
+  loss_fake <- torch::torch_mean(torch::nnf_relu(1. + dis_fake))
+  return(loss_fake)
+}
+
+
+hinge_gen <- function(dis_fake){
+  loss <- -torch::torch_mean(dis_fake)
+  return(loss)
+}
+
+
+kl_r <- function(dis_fake) {
+  dis_fake_norm <- torch::torch_exp(dis_fake)$mean()
+  dis_fake_ratio <- torch::torch_exp(dis_fake) / dis_fake_norm
+  res <-
+    (dis_fake_ratio / dis_fake_norm) * (
+      dis_fake - torch::torch_logsumexp(dis_fake, dim = 1) +
+        torch::torch_log(torch::torch_tensor(dis_fake$size(1)))$to(device)
+    )
+  return(res)
+
+}
+
+#define _l2normalization
+l2normalize <- function(v, eps=1e-12) {
+  return(v / (torch::torch_norm(v) + eps))
+}
+
+
+apply_activate <- function(data, transformer, temperature = .66) {
+  DIM <- data$shape[2]
+  data_t <- list()
+  st <- 1
+  for(item in transformer$output_info) {
+    if(item[[2]] == "linear"){
+      ed <- st + item[[1]] - 1
+      data_t[[length(data_t)+1]] <- data[,st:ed]
+      st <- ed + 1
+    } else if(item[[2]] == "tanh") {
+      ed <- st + item[[1]] - 1
+      data_t[[length(data_t)+1]] <- torch::torch_tanh(data[,st:ed])
+      st <- ed + 1
+    } else if(item[[2]] == "softmax") {
+      ed <- st + item[[1]] - 1
+      transformed <- torch::nnf_gumbel_softmax(data[,st:ed], tau = 0.2)
+      data_t[[length(data_t)+1]] <- transformed
+      st <- ed + 1
+    } else {
+      NULL
+    }
+  }
+  data_t[[length(data_t)+1]] <- torch::torch_sigmoid(data[,st:DIM]/temperature)
+
+  return(torch::torch_cat(data_t, dim = 2))
+
+}
+
+apply_mask_activate <- function(data, temperature = 0.66) {
+  DIM <- data$shape[2]
+  data_t <- torch::torch_sigmoid(data[,1:DIM]/temperature)
+
+  return(data_t)
+}
+
+match_mask <- function(M, transformer) {
+  end_idxs <-
+    cumsum(sapply(transformer$meta, function(x)
+      x$output_dimensions))
+
+  start_idxs <- (c(0, end_idxs) + 1)[1:length(end_idxs)]
+
+  idxs_mat <- cbind(start_idxs, end_idxs)
+
+  M_new <- list()
+
+
+
+  for (i in 1:nrow(idxs_mat)) {
+    n <- length(seq(idxs_mat[i, 1], idxs_mat[i, 2]))
+    M_new[[i]] <- replicate(n, M[, i])
+  }
+
+  M_new <- do.call("cbind", M_new)
+
+  return(torch::torch_tensor(M_new))
+}
+
+
+sample_g_output <-
+  function(encoder, decoder, data, mask, transformer) {
+    dim <- data$shape[2]
+    data <- data * mask
+    torch::with_no_grad({
+      encoded_data <- encoder(data$to(device = device))
+      decoded_data <-
+        apply_activate(decoder(encoded_data))$detach()$cpu()
+    })
+    synth_data <- data * mask + (1 - mask) * decoded_data
+    synth_data <- torch::as_array(synth_data$detach()$cpu())
+    synth_data <- transformer$inverse_transform(synth_data)
+
+    decoded_data <-
+      transformer$inverse_transform(torch::as_array(decoded_data$detach()$cpu()))
+
+    return(list(encoded_data = torch::as_array(encoded_data$detach()$cpu()),
+                imputed_data = synth_data,
+                synthetic_data = decoded_data))
+  }
+
+
+
+
