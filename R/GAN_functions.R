@@ -139,7 +139,7 @@ SpectralNorm <- torch::nn_module(
     w <- self$module$parameters[[paste0(self$name)]]
 
     height <- w$data()$shape[1]
-    width <- w$view(c(height, -1))$data$shape[1]
+    width <- w$view(c(height, -1))$data()$shape[1]
 
     u <- torch::nn_parameter(torch::torch_randn(height), requires_grad = FALSE)
     v <- torch::nn_parameter(torch::torch_randn(width), requires_grad = FALSE)
