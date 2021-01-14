@@ -193,7 +193,7 @@ GAN_update_step <-
 
 init_weights <- function(m){
   if( "nn_linear" %in% attributes(m)$class){
-    torch::nn_init_kaiming_normal_(m$weight$cpu()$to(device = device))
+    torch::nn_init_kaiming_normal_(m$weight$cpu())$to(device = device)
     m$bias$data()$cpu()$fill_(0.01)$to(device = device)
   }
 
