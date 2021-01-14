@@ -407,9 +407,9 @@ Reverse <- torch::nn_module(
       return(list(index_array(inputs, length(dim(inputs)), self$perm), torch::torch_zeros_like(inputs)))
     } else if(mode == "inverse") {
       return(list(index_array(inputs, length(dim(inputs)), self$inv_perm), torch::torch_zeros_like(inputs)))
+    } else {
+      stop("Mode must be one of forward or inverse.")
     }
-  } else {
-    stop("Mode must be one of forward or inverse.")
   }
 )
 
