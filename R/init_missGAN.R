@@ -76,7 +76,7 @@ GAN_training_loop <-
             sample_synthetic_data(GAN_nets$Generator, GAN_nets$fixed_z)
           # Now we plot the training data.
           plot(
-            torch::as_array(GAN_nets$torch_data),
+            torch::as_array(GAN_nets$torch_data$cpu()),
             bty = "n",
             col = viridis::viridis(2, alpha = 0.7)[1],
             pch = 19,
