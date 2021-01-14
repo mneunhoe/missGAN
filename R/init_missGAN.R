@@ -4,11 +4,9 @@ init_missGAN <- function(dat,
   data_dim <- ncol(dat)
 
   # Now, we can set up a Generator net and send it to our device (cpu or gpu)
-  # g_net <-
-  #   Generator(noise_dim, data_dim)$to(device = device)
-
   g_net <-
-    FlowEncoder(noise_dim, data_dim)$to(device = device)
+    Generator(noise_dim, data_dim)$to(device = device)
+
 
   # To update the parameters of the network we need setup an optimizer. Here we use the adam optimizer with a learning rate of 0.0002
   g_optim <- torch::optim_adam(g_net$parameters, lr = 0.0002)
