@@ -295,7 +295,7 @@ sample_g_output <-
     torch::with_no_grad({
       encoded_data <- encoder(data$to(device = device))
       decoded_data <-
-        apply_activate(decoder(encoded_data))$detach()$cpu()
+        apply_activate(decoder(encoded_data), transformer)$detach()$cpu()
     })
     synth_data <- data * mask + (1 - mask) * decoded_data
     synth_data <- torch::as_array(synth_data$detach()$cpu())
