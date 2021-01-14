@@ -144,8 +144,8 @@ SpectralNorm <- torch::nn_module(
     u <- torch::nn_parameter(torch::torch_randn(height), requires_grad = FALSE)
     v <- torch::nn_parameter(torch::torch_randn(width), requires_grad = FALSE)
 
-    u$data() <- l2normalize(u$data())
-    v$data() <- l2normalize(v$data())
+    u <- l2normalize(u$data())
+    v <- l2normalize(v$data())
     w_bar <- torch::nn_parameter(w$data())
 
     self$module$register_parameter(paste0(self$name, "_u"), u)
