@@ -114,7 +114,7 @@ DataTransformer <- R6::R6Class(
     },
     inverse_transform_discrete = function(meta, data) {
       levs <- meta$levs
-      column <- factor(data %*% 1:length(levs))
+      column <- factor(round(data) %*% 1:length(levs))
       levels(column) <- levs
       column <- as.numeric(as.character(column))
       return(column)
