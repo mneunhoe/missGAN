@@ -109,6 +109,56 @@ Discriminator <- torch::nn_module(
 )
 
 
+SpectralNorm <- torch::nn_module(
+  initialize = function(module, name = "weight", power_iterations = 1) {
+    self$module <- module
+    self$name <- name
+    self$power_iterations <- power_iterations
+    if(!self$made_params()){
+      self$make_params()
+    }
+  },
+  update_u_v = function() {
+    u <- self$module$parameters[[paste0(self$name, "_u")]]
+    v <- self$module$parameters[[paste0(self$name, "_v")]]
+    w <- self$module$parameters[[paste0(self$name, "_bar")]]
+
+    height <- w$data$shape[1]
+    for(i in 1:self$power_iterations) {
+      v$data <- l2normalize(torch::torch_mv(torch::torch_t(w$view(c(height, -1))$data()), u$data()))
+      u$data <- l2normalize(torch::torch_mv(w$view(c(height, -1))$data(), v$data()))
+    }
+    sigma <- u$dot(w$view(c(height, -1))$mv(v))
+    self$module$parameters[[paste0(self$name)]] <- w / sigma$expand_as(w)
+
+  },
+  made_params = function() {
+    ifelse(all(paste0(self$name, c("_u", "_v", "_bar")) %in% names(self$module$parameters)), TRUE, FALSE)
+  },
+  make_params = function() {
+    w <- self$module$parameters[[paste0(self$name)]]
+
+    height <- w$data()$shape[1]
+    width <- w$view(c(height, -1))$data$shape[1]
+
+    u <- torch::nn_parameter(torch::torch_randn(height), requires_grad = FALSE)
+    v <- torch::nn_parameter(torch::torch_randn(width), requires_grad = FALSE)
+
+    u$data() <- l2normalize(u$data())
+    v$data() <- l2normalize(v$data())
+    w_bar <- torch::nn_parameter(w$data())
+
+    self$module$register_parameter(paste0(self$name, "_u"), u)
+    self$module$register_parameter(paste0(self$name, "_v"), v)
+    self$module$register_parameter(paste0(self$name, "_bar"), w_bar)
+  },
+  forward = function(...) {
+    self$update_u_v()
+    return(self$module$forward(...))
+
+  }
+)
+
 # We will use the kl GAN loss
 # You can find the paper here: https://arxiv.org/abs/1910.09779
 # And the original python implementation here: https://github.com/ermongroup/f-wgan
