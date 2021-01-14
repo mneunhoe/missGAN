@@ -397,19 +397,8 @@ dgp_fct <-
 MICycle_pre_process <-
   function(data_list,
            discrete_columns = NULL,
-           cluster_columns = NULL,
            transformer = NULL) {
-    # Set NA to tau and generate M
-    if (!is.null(discrete_columns)) {
-      discrete_columns <- as.list(discrete_columns - 1)
-    } else {
-      discrete_columns <- list()
-    }
-    if (!is.null(cluster_columns)) {
-      cluster_columns <- as.list(cluster_columns - 1)
-    } else {
-      cluster_columns <- list()
-    }
+
 
     pre_proc_list <-  pre_process_missing_data(data_list$D)
 
@@ -427,7 +416,7 @@ MICycle_pre_process <-
 
 
     torch_data <- torch::torch_tensor(train_data)
-    torch_mask <-torch::torch_tensor(train_mask)
+    torch_mask <- torch::torch_tensor(train_mask)
 
     return(
       list(

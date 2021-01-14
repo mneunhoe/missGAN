@@ -284,7 +284,7 @@ match_mask <- function(M, transformer) {
 
   M_new <- do.call("cbind", M_new)
 
-  return(torch::torch_tensor(M_new))
+  return(M_new)
 }
 
 
