@@ -231,7 +231,7 @@ l2normalize <- function(v, eps=1e-12) {
 max_singular_value <- function(W, u=NULL, Ip=1){
    
     if(!is.null(u)){
-        u = torch::torch_tensor(1, W$size(1)).normal_(0, 1)$to(device)
+        u = torch::torch_tensor(1, W$size(1))$normal_(0, 1)$to(device)
       }
     bar_u = u
     for(i in 1:Ip){
