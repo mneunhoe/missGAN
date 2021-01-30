@@ -105,6 +105,27 @@ Discriminator <- torch::nn_module(
                         name = "Output")
 
   },
+  calc_gradient_penalty = function(self, real_data, fake_data, device=device, pac=1, lambda_=10){
+        alpha = torch::torch_rand(real_data$size(1) %/% pac, 1, 1, device=device)
+        alpha = alpha$expand(c(1, pac, real_data$size(2)))
+        alpha = alpha$view(-1, real_data$size(2))
+
+        interpolates = alpha * real_data + ((1 - alpha) * fake_data)
+
+        disc_interpolates = self(interpolates)
+
+        gradients = torch::autograd_grad(
+            outputs=disc_interpolates, inputs=interpolates,
+            grad_outputs=torch::torch_ones(disc_interpolates$size(), device=device),
+            create_graph=TRUE, retain_graph=TRUE, only_inputs=TRUE
+        )[1]
+
+        gradient_penalty = ((
+            gradients$view(-1, pac * real_data$size(2))$norm(2, dim=2) - 1
+        ) ^ 2)$mean() * lambda_
+
+        return(gradient_penalty)
+    },
   forward = function(input) {
     data <- self$seq(input$view(c(-1, self$packdim)))
     data
