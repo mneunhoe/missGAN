@@ -264,11 +264,11 @@ init_missGAN2 <- function(dat, mask, transformer,
   if(optimizer == "adam") {
     d_optim <- torch::optim_adam(do.call(c, list(discriminator_d$parameters,
                                                      discriminator_e$parameters)),
-                                     lr = base_lr * ttur_d_factor)
+                                     lr = base_lr * ttur_d_factor, betas = c(0.5, 0.9))
     g_optim <- torch::optim_adam(do.call(c, list(encoder$parameters,
                                                      decoder$parameters,
                                                      mask_decoder$parameters)),
-                                     lr = base_lr)
+                                     lr = base_lr, betas = c(0.5, 0.9))
   }
   if(optimizer == "adamw") {
     d_optim <- torch::optim_adam(do.call(c, list(discriminator_d$parameters,
