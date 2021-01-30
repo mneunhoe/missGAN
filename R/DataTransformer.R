@@ -19,8 +19,8 @@ DataTransformer <- R6::R6Class(
     },
     fit_continuous = function(column = NULL, data = NULL) {
       data <- data[, 1]
-      mean <- mean(data)
-      std <- sd(data)
+      mean <- mean(data, na.rm = T)
+      std <- sd(data, na.rm = T)
 
       return(
         list(
@@ -86,7 +86,10 @@ DataTransformer <- R6::R6Class(
 
       oh <- model.matrix(~0 + factor(data, levels = column_meta$levs))
       colnames(oh) <- column_meta$levs
-      return(oh)
+      oh_na <- array(NA, dim = c(length(data), ncol(oh)))
+      oh_na[!is.na(data),] <- oh
+      colnames(oh_na) <- colnames(oh)
+      return(oh_na)
     },
     transform = function(data) {
       values <- list()
