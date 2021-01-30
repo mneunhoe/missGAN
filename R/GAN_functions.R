@@ -122,7 +122,7 @@ SpectralNorm <- torch::nn_module(
   update_u_v = function() {
     u <- self$module$parameters[[paste0(self$name, "_u")]]
     v <- self$module$parameters[[paste0(self$name, "_v")]]
-    w <- self$module$parameters[[paste0(self$name), "_bar"]]
+    w <- self$module$parameters[[paste0(self$name, "_bar")]]
 
     height <- w$data()$shape[1]
     for(i in 1:self$power_iterations) {
