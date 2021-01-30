@@ -9,6 +9,7 @@ ResidualBlock <- torch::nn_module(
   initialize = function(i, o) {
     # We will use a fully connected (fc) linear layer
     self$fc <- torch::nn_linear(i, o)
+    self$bn <- torch::nn_batch_norm1d(o)
     # Followed by a leakyReLU activation.
     self$leaky_relu <- torch::nn_leaky_relu()
   },
@@ -16,6 +17,7 @@ ResidualBlock <- torch::nn_module(
     # A forward pass will take the input and pass it through the linear layer
     out <- self$fc(input)
     # Then on each element of the output apply the leaky_relu activation
+    out <- self$bn(out)
     out <- self$leaky_relu(out)
     # To pass the input through as well we concatenate (cat) the out and input tensor.
     torch::torch_cat(list(out, input), dim = 2)
