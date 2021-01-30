@@ -122,7 +122,7 @@ SpectralNorm <- torch::nn_module(
   update_u_v = function() {
     u <- self$module$parameters[[paste0(self$name, "_u")]]
     v <- self$module$parameters[[paste0(self$name, "_v")]]
-    w <- self$module$parameters[[paste0(self$name)]]
+    w <- self$module$parameters[[paste0(self$name), "_bar"]]
 
     height <- w$data()$shape[1]
     for(i in 1:self$power_iterations) {
@@ -228,6 +228,19 @@ l2normalize <- function(v, eps=1e-12) {
   return(v / (torch::torch_norm(v) + eps))
 }
 
+max_singular_value <- function(W, u=NULL, Ip=1){
+   
+    if(!is.null(u)){
+        u = torch::torch_tensor(1, W$size(1)).normal_(0, 1)$to(device)
+      }
+    bar_u = u
+    for(i in 1:Ip){
+        bar_v = l2normalize(torch::torch_matmul(bar_u, W$data()), eps=1e-12)
+        bar_u = l2normalize(torch::torch_matmul(bar_v, torch::torch_transpose(W$data(), 1, 2)), eps=1e-12)
+      }
+    sigma = torch::torch_sum(torch::nnf_linear(bar_u, torch::torch_transpose(W$data(), 1, 2)) * bar_v)
+    return(list(sigma, bar_u))
+}
 
 apply_activate <- function(data, transformer, temperature = .66) {
   DIM <- data$shape[2]
