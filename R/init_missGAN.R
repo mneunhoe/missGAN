@@ -362,14 +362,14 @@ GAN2_update_step <-
       real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
       fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
     
-      pen_d <- GAN_nets$discriminator_d$calc_gradient_penalty(
+      pen_d <- GAN_nets$discriminator_d$calc_gradient_penalty(GAN_nets$discriminator_d,
                         real_mask*real_data + (1-real_mask)*noise, fake_mask*x_gen + (1-fake_mask)*noise, device = device)
       loss_d <- -(torch::torch_mean(real_d_score) - torch::torch_mean(fake_d_score))
     
       fake_e_score <- GAN_nets$discriminator_e(z_enc)
       real_e_score <- GAN_nets$discriminator_e(z_gen)
       
-      pen_e <- GAN_nets$discriminator_e$calc_gradient_penalty(
+      pen_e <- GAN_nets$discriminator_e$calc_gradient_penalty(GAN_nets$discriminator_e,
                         z_gen, z_enc, device = device)
       loss_e <- -(torch::torch_mean(real_e_score) - torch::torch_mean(fake_e_score))
 
