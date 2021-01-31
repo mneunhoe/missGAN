@@ -318,6 +318,7 @@ init_missGAN2 <- function(dat, mask, transformer,
 
 GAN2_update_step <-
   function(GAN_nets,
+           loss = "wgan_gp",
            batch_size = 50) {
     ##########################
     # Sample Batch of Data
@@ -356,7 +357,31 @@ GAN2_update_step <-
 
     fake_mask <- apply_mask_activate(GAN_nets$mask_decoder(z_gen))
     mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc))
+    
+    if(loss == "wgan_gp"){
+      real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
+      fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
+    
+      pen_d <- GAN_nets$discriminator_d$calc_gradient_penalty(
+                        real_mask*real_data + (1-real_mask)*noise, fake_mask*x_gen + (1-fake_mask)*noise, device = device)
+      loss_d <- -(torch::torch_mean(real_d_score) - torch::torch_mean(fake_d_score))
+    
+      fake_e_score <- GAN_nets$discriminator_e(z_enc)
+      real_e_score <- GAN_nets$discriminator_e(z_gen)
+      
+      pen_e <- GAN_nets$discriminator_e$calc_gradient_penalty(
+                        z_gen, z_enc, device = device)
+      loss_e <- -(torch::torch_mean(real_e_score) - torch::torch_mean(fake_e_score))
 
+      GAN_nets$d_optim$zero_grad()
+      pen_d$backward(retain_graph=TRUE)
+      loss_d$backward()
+      pen_e$backward(retain_graph=TRUE)
+      loss_e$backward()              
+      GAN_nets$d_optim$step()
+      
+      
+    } else {
     real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
     fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
 
@@ -368,7 +393,7 @@ GAN2_update_step <-
 
     loss_e_real <- kl_real(real_e_score)
     loss_e_fake <- kl_fake(fake_e_score)
-
+    
     loss_d <- (loss_d_real + loss_d_fake)*0.5
     loss_e <- (loss_e_real + loss_e_fake)*0.5
     D_loss <-  loss_d + loss_e
@@ -378,7 +403,7 @@ GAN2_update_step <-
     GAN_nets$d_optim$zero_grad()
     D_loss$backward()
     GAN_nets$d_optim$step()
-
+}
     ###########################
     # Update the Generator
     ###########################
@@ -436,9 +461,13 @@ GAN2_update_step <-
 
     fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen)
     fake_e_score <- GAN_nets$discriminator_e(z_enc)
+    if(loss == "wgan_gp"){
+      G_loss_d <- -torch::torch_mean(fake_d_score)
+      G_loss_e <- -torch::torch_mean(fake_e_score)
+   } else {
     G_loss_d <- kl_gen(fake_d_score)
     G_loss_e <- kl_gen(fake_e_score)
-
+}
     G_loss1 <- G_loss_d + G_loss_e
     G_loss <- G_loss1 + GAN_nets$g_loss_weights[[1]] * ae_loss + GAN_nets$g_loss_weights[[2]] * z_ae_loss + GAN_nets$g_loss_weights[[3]] * mask_ae_loss
 
