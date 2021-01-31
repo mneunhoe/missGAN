@@ -106,9 +106,9 @@ Discriminator <- torch::nn_module(
 
   },
   calc_gradient_penalty = function(self, real_data, fake_data, device=device, pac=1, lambda_=10){
-        alpha = torch::torch_rand(real_data$size(1) %/% pac, 1, 1, device=device)
-        alpha = alpha$expand(c(1, pac, real_data$size(2)))
-        alpha = alpha$view(-1, real_data$size(2))
+        alpha = torch::torch_rand(real_data$size(1), 1, device=device)
+        alpha = alpha$expand(c(real_data$size(1),real_data$size(2)))
+        #alpha = alpha$view(-1, real_data$size(2))
 
         interpolates = alpha * real_data + ((1 - alpha) * fake_data)
 
