@@ -374,13 +374,16 @@ GAN2_update_step <-
       pen_e <- GAN_nets$discriminator_e$calc_gradient_penalty(GAN_nets$discriminator_e,
                         z_gen, z_enc, device = device)
       loss_e <- -(torch::torch_mean(real_e_score) - torch::torch_mean(fake_e_score))
+      
+      
+      
+    D_loss <-  loss_d*0.5 + loss_e*0.5 + pen_d + pen_e
+    D_loss <- D_loss$mean()
+    D_loss$requires_grad <- T
 
-      GAN_nets$d_optim$zero_grad()
-      pen_d$backward(retain_graph=TRUE)
-      loss_d$backward()
-      pen_e$backward(retain_graph=TRUE)
-      loss_e$backward()              
-      GAN_nets$d_optim$step()
+    GAN_nets$d_optim$zero_grad()
+    D_loss$backward()
+    GAN_nets$d_optim$step()
       
       
     } else {
