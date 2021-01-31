@@ -117,7 +117,7 @@ Discriminator <- torch::nn_module(
         gradients = torch::autograd_grad(
             outputs=disc_interpolates, inputs=interpolates,
             grad_outputs=torch::torch_ones(disc_interpolates$size(), device=device),
-            create_graph=TRUE, retain_graph=TRUE, only_inputs=TRUE
+            create_graph=TRUE, retain_graph=TRUE
         )[[1]]
 
         gradient_penalty = ((
