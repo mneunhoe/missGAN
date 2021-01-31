@@ -348,6 +348,7 @@ GAN2_update_step <-
     }
 
     noise <- torch::torch_randn(real_mask$shape)$to(device = device)
+    noise$requires_grad <- T
     z_enc <- GAN_nets$encoder(real_mask*real_data + (1-real_mask)*noise)
     #z_enc <- GAN_nets$encoder(real_data*real_mask)
     z_gen <- torch::torch_empty_like(z_enc)$cpu()$normal_()$to(device = device)
@@ -359,6 +360,7 @@ GAN2_update_step <-
     mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc))
     
     if(loss == "wgan_gp"){
+      
       real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
       fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
     
