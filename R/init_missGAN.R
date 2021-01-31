@@ -347,8 +347,8 @@ GAN2_update_step <-
       p$requires_grad_(F)
     }
 
-    #noise <- torch::torch_randn(real_mask$shape)$to(device = device)
-    noise <- torch::torch_zeros(real_mask$shape)$to(device = device)
+    noise <- torch::torch_randn(real_mask$shape)$to(device = device)
+    #noise <- torch::torch_zeros(real_mask$shape)$to(device = device)
     noise$requires_grad <- T
     z_enc <- GAN_nets$encoder(real_mask*real_data + (1-real_mask)*noise)
     #z_enc <- GAN_nets$encoder(real_data*real_mask)
