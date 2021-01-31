@@ -120,10 +120,9 @@ Discriminator <- torch::nn_module(
             create_graph=TRUE, retain_graph=TRUE
         )[[1]]
 
-        gradient_penalty = ((
-            gradients$view(c(-1, pac * real_data$size(2))$norm(2, dim=2) - 1
-        ) ^ 2))$mean() * lambda_
-
+        
+        
+        gradient_penalty = ((gradients$norm(2, dim=2) - 1) ^ 2)$mean() * lambda_
         return(gradient_penalty)
     },
   forward = function(input) {
