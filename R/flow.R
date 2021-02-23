@@ -195,9 +195,9 @@ Reverse <- torch::nn_module(
   },
   forward = function(inputs, context = NULL, mode = "forward") {
     if(mode == "forward"){
-      return(list(index_array(inputs, length(dim(inputs)), self$perm), torch::torch_zeros_like(inputs)))
+      return(list(index_array(inputs, length(dim(inputs)), self$perm), torch::torch_zeros_like(inputs, device = device)))
     } else if(mode == "inverse") {
-      return(list(index_array(inputs, length(dim(inputs)), self$inv_perm), torch::torch_zeros_like(inputs)))
+      return(list(index_array(inputs, length(dim(inputs)), self$inv_perm), torch::torch_zeros_like(inputs, device = device)))
     } else {
       stop("Mode must be one of forward or inverse.")
     }
