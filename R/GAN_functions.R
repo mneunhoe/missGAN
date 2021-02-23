@@ -1,6 +1,6 @@
 # First, we check whether a compatible GPU is available for computation.
-#use_cuda <- torch::cuda_is_available()
-use_cuda <- F
+use_cuda <- torch::cuda_is_available()
+#use_cuda <- F
 # If so we would use it to speed up training.
 device <- ifelse(use_cuda, "cuda", "cpu")
 
