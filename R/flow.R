@@ -3,7 +3,7 @@ InverseAutoregressiveFlow <- torch::nn_module(
   initialize = function(num_input, num_hidden, num_context) {
     self$made <- MADE(num_input=num_input, num_output=num_input * 2,
                       num_hidden=num_hidden, num_context=num_context)
-    self$sigmoid_arg_bias <- torch::nn_parameter(torch::torch_ones(num_input) * 2)
+    self$sigmoid_arg_bias <- torch::nn_parameter(torch::torch_ones(num_input, device = device) * 2)
     self$sigmoid <- torch::nn_sigmoid()
     self$log_sigmoid <- torch::nn_log_sigmoid()
   },
@@ -44,7 +44,7 @@ FlowSequential <- function(... , name = NULL) {
       }
     },
     forward = function(input, context = NULL) {
-      total_log_prob <- torch::torch_zeros_like(input)
+      total_log_prob <- torch::torch_zeros_like(input, device = device)
       for(block in self$modules$values){
         input_log_prob <- block(input, context)
         total_log_prob <- total_log_prob + log_prob
@@ -120,7 +120,7 @@ MADE <- torch::nn_module(
                   
         #mask = array(self$m_[[i]], dim = c(1, length(self$m_[[i]]))) >= array(self$m_[[i - 1]], dim = c(length(self$m_[[i-1]]), 1))
       }
-      self$masks[[length(self$masks)+1]] <- torch::torch_tensor(t(mask*1))
+      self$masks[[length(self$masks)+1]] <- torch::torch_tensor(t(mask*1), device = device)
       
       
     }
