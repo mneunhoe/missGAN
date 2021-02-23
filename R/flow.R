@@ -131,7 +131,7 @@ MADE <- torch::nn_module(
     for(i in 2:length(self$masks)) {
       prev <- torch::torch_matmul(prev, self$masks[[i]]$t())
     }
-    final <- torch::as_array(prev)
+    final <- torch::as_array(prev$cpu())
     num_input <- self$masks[[1]]$shape[2]
     num_output <- self$masks[[length(self$masks)]]$shape[1]
     all(dim(final) == c(num_input, num_output))
