@@ -131,7 +131,7 @@ FlowEncoder <- torch::nn_module(
     mu_logvar <- fc_out[1:2]
     std <- torch::nnf_softplus(mu_logvar[[2]])
     qz_x <- torch::distr_normal(mu_logvar[[1]], std)
-    z <- qz_x$rsample(k_samples) 
+    z <- qz_x$rsample(k_samples)$to(device = device) 
     log_q_z <- qz_x$log_prob(z)
     if(!is.null(self$q_z_flow)) {
       log_q_z_flow <- self$q_z_flow(z, context = fc_out[[3]])
@@ -147,7 +147,7 @@ FlowEncoder <- torch::nn_module(
     mu_logvar <- fc_out[1:2]
     std <- torch::nnf_softplus(mu_logvar[[2]])
     qz_x <- torch::distr_normal(mu_logvar[[1]], std)
-    z <- qz_x$rsample()
+    z <- qz_x$rsample()$to(device = device)
     if(!is.null(self$q_z_flow)){
       z_ <- self$q_z_flow(z, context = fc_out[[3]])
     }
