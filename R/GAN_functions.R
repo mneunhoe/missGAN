@@ -65,7 +65,95 @@ Generator <- torch::nn_module(
   }
 )
 
-
+# Now we can define the architecture for the Generator as a nn_module.
+FlowEncoder <- torch::nn_module(
+  initialize = function(noise_dim, # The length of our noise vector per example
+                        data_dim, # The number of columns in our data
+                        hidden_units = list(128, 128), # A list with the number of neurons per layer. If you add more elements to the list you create a deeper network.
+                        flow_depth = 2,
+                        logprob = FALSE,
+                        dropout_rate = 0 # The dropout probability
+  ) {
+    
+    if(logprob) {
+      self$encode_func <- self$encode_logprob
+    } else
+      self$encode_func <- self$encode
+    
+    dim <- noise_dim
+    # Initialize an empty nn_sequential module
+    self$main <- torch::nn_sequential()
+    
+    # i will be a simple counter to keep track of our network depth
+    i <- 1
+    
+    # Now we loop over the list of hidden units and add the hidden layers to the nn_sequential module
+    for (neurons in hidden_units) {
+      # First, we add a ResidualBlock of the respective size.
+      self$main$add_module(module =  ResidualBlock(dim, neurons),
+                           name = paste0("ResBlock_", i))
+      # And then a Dropout layer.
+      self$main$add_module(module = torch::nn_dropout(dropout_rate),
+                           name = paste0("Dropout_", i))
+      # Now we update our dim for the next hidden layer.
+      # Since it will be another ResidualBlock the input dimension will be dim+neurons
+      dim <- dim + neurons
+      # Update the counter
+      i <- i + 1
+    }
+    # Finally, we add the output layer. The output dimension must be the same as our data dimension (data_dim).
+    self$main$add_module(module = torch::nn_linear(dim, 4*dim),
+                         name = "Output")
+    
+    if(flow_depth > 0) {
+      hidden_size <- data_dim * 2
+      flow_layers <- replicate(flow_depth, InverseAutoregressiveFlow(data_dim, hidden_size, data_dim), simplify = F)
+      flow_layers[[length(flow_layers)+1]] <- Reverse(data_dim)
+      self$q_z_flow <- do.call(FlowSequential, flow_layers)
+      self$enc_chunk <- 3
+    } else {
+      self$q_z_flow <- NULL
+      self$enc_chunk <- 2
+    }
+    fc_out_size <- data_dim * self$enc_chunk
+    out_size <- 4*dim
+    self$fc <- torch::nn_sequential(torch::nn_linear(out_size, fc_out_size),
+                                    torch::nn_layer_norm(fc_out_size),
+                                    torch::nn_leaky_relu(0.2),
+                                    torch::nn_linear(fc_out_size, fc_out_size))
+  },
+  forward = function(input, k_samples = 5) {
+    self$encode_func(input, k_samples)
+  },
+  encode_logprob = function(input, k_samples = 5) {
+    x <- self$main(input)
+    fc_out <- self$fc(x)$chunk(self$enc_chunk, dim = 2)
+    mu_logvar <- fc_out[1:2]
+    std <- torch::nnf_softplus(mu_logvar[[2]])
+    qz_x <- torch::distr_normal(mu_logvar[[1]], std)
+    z <- qz_x$rsample(k_samples) 
+    log_q_z <- qz_x$log_prob(z)
+    if(!is.null(self$q_z_flow)) {
+      log_q_z_flow <- self$q_z_flow(z, context = fc_out[[3]])
+      log_q_z <- log_q_z_flow$sum(-1)
+    } else {
+      log_q_z <- log_q_z$sum(-1)
+    }
+    return(list(z, log_q_z))
+  },
+  encode = function(input, nothing) {
+    x <- self$main(input)
+    fc_out <- self$fc(x)$chunk(self$enc_chunk, dim = 2)
+    mu_logvar <- fc_out[1:2]
+    std <- torch::nnf_softplus(mu_logvar[[2]])
+    qz_x <- torch::distr_normal(mu_logvar[[1]], std)
+    z <- qz_x$rsample()
+    if(!is.null(self$q_z_flow)){
+      z_ <- self$q_z_flow(z, context = fc_out[[3]])
+    }
+    return(z_[[1]])
+  }
+)
 # And we can define the architecture for the Discriminator as a nn_module.
 Discriminator <- torch::nn_module(
   initialize = function(data_dim, # The number of columns in our data
