@@ -107,9 +107,9 @@ FlowEncoder <- torch::nn_module(
     
     if(flow_depth > 0) {
       hidden_size <- data_dim * 2
-      flow_layers <- replicate(flow_depth, InverseAutoregressiveFlow(data_dim, hidden_size, data_dim), simplify = F)
-      flow_layers[[length(flow_layers)+1]] <- Reverse(data_dim)
-      self$q_z_flow <- do.call(FlowSequential, flow_layers)
+      flow_layers <- replicate(flow_depth, InverseAutoregressiveFlow(data_dim, hidden_size, data_dim), simplify = F)$to(device = device) 
+      flow_layers[[length(flow_layers)+1]] <- Reverse(data_dim)$to(device = device) 
+      self$q_z_flow <- do.call(FlowSequential, flow_layers)$to(device = device) 
       self$enc_chunk <- 3
     } else {
       self$q_z_flow <- NULL
@@ -131,8 +131,9 @@ FlowEncoder <- torch::nn_module(
     mu_logvar <- fc_out[1:2]
     std <- torch::nnf_softplus(mu_logvar[[2]])
     qz_x <- torch::distr_normal(mu_logvar[[1]], std)
-    z <- qz_x$rsample(k_samples)$to(device = device) 
-    log_q_z <- qz_x$log_prob(z)
+    z <- qz_x$rsample(k_samples)
+    log_q_z <- qz_x$log_prob(z)$to(device = device)
+    z <- z$to(device = device)
     if(!is.null(self$q_z_flow)) {
       log_q_z_flow <- self$q_z_flow(z, context = fc_out[[3]])
       log_q_z <- log_q_z_flow$sum(-1)
