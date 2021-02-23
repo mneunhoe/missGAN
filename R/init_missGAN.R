@@ -200,7 +200,7 @@ init_weights <- function(m){
 }
 
 init_missGAN2 <- function(dat, mask, transformer,
-                         latent_dim = 2,
+                         latent_dim = 2, IAF = T,
                          optimizer = "adam",
                          base_lr = 0.001, ttur_d_factor = 1,
                          n_encoder = list(256, 128),
@@ -216,6 +216,15 @@ init_missGAN2 <- function(dat, mask, transformer,
   data_dim <- ncol(dat)
 
   # Now, we can set up a Generator net and send it to our device (cpu or gpu)
+  if(IAF){
+    encoder <-
+    FlowEncoder(
+      noise_dim = data_dim,
+      data_dim = latent_dim,
+      hidden_units = n_encoder,
+      dropout_rate = encoder_dropout_rate
+    )$to(device = device)
+    } else {
   encoder <-
     Generator(
       noise_dim = data_dim,
@@ -225,7 +234,7 @@ init_missGAN2 <- function(dat, mask, transformer,
     )$to(device = device)
 
   encoder$apply(init_weights)
-
+}
   decoder <-
     Generator(
       noise_dim = latent_dim,
