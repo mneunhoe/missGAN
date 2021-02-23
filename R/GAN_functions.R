@@ -107,7 +107,7 @@ FlowEncoder <- torch::nn_module(
     
     if(flow_depth > 0) {
       hidden_size <- data_dim * 2
-      flow_layers <- replicate(flow_depth, InverseAutoregressiveFlow(data_dim, hidden_size, data_dim), simplify = F)$to(device = device) 
+      flow_layers <- replicate(flow_depth, InverseAutoregressiveFlow(data_dim, hidden_size, data_dim)$to(device = device), simplify = F) 
       flow_layers[[length(flow_layers)+1]] <- Reverse(data_dim)$to(device = device) 
       self$q_z_flow <- do.call(FlowSequential, flow_layers)$to(device = device) 
       self$enc_chunk <- 3
