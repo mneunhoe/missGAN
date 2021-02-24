@@ -124,7 +124,7 @@ DataTransformer <- R6::R6Class(
 #})*1) %*% 1:length(levs))
       max_index <- max.col(data, ties.method = "random")
       row_col_index <- stack(setNames(max_index, seq_along(max_index)))
-      max_matrix <- Matrix::sparseMatrix(as.numeric(row_col_index[,2]), row_col_index[,1], x=1)
+      max_matrix <- Matrix::sparseMatrix(as.numeric(row_col_index[,2]), row_col_index[,1], x=1, dims = c(max(as.numeric(row_col_index[,2])), length(levs))
 
       column <- factor(as.matrix(max_matrix) %*% 1:length(levs))
       levels(column) <- levs
