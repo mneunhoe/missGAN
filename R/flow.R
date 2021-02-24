@@ -35,7 +35,7 @@ InverseAutoregressiveFlow <- torch::nn_module(
 
 
 FlowSequential <- function(... , name = NULL) {
-  module <- nn_module(
+  module <- torch::nn_module(
     classname = ifelse(is.null(name), "flow_sequential", name),
     initialize = function(...) {
       modules <- rlang::list2(...)
