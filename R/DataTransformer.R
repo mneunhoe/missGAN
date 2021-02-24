@@ -118,10 +118,15 @@ DataTransformer <- R6::R6Class(
     inverse_transform_discrete = function(meta, data) {
       levs <- meta$levs
       #column <- factor(round(data) %*% 1:length(levs))
-      column <- factor(t(apply(data, 1, function(x){
-  ranks <- rank(x, ties.method = "random")
-  ranks == max(ranks)
-})*1) %*% 1:length(levs))
+      #column <- factor(t(apply(data, 1, function(x){
+  #ranks <- rank(x, ties.method = "random")
+  #ranks == max(ranks)
+#})*1) %*% 1:length(levs))
+      max_index <- max.col(data, ties.method = "random")
+      row_col_index <- stack(setNames(max_index, seq_along(max_index)))
+      max_matrix <- Matrix::sparseMatrix(as.numeric(row_col_index[,2]), row_col_index[,1], x=1)
+
+      column <- factor(as.matrix(max_matrix) %*% 1:length(levs))
       levels(column) <- levs
       column <- as.numeric(as.character(column))
       return(column)
