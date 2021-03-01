@@ -495,5 +495,7 @@ GAN2_update_step <-
         "\t Generator loss: ",
         G_loss$item(),
         "\n")
+    
+    return(list(D_loss$item(), G_loss$item()))
   }
 
