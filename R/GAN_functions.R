@@ -353,7 +353,7 @@ max_singular_value <- function(W, u=NULL, Ip=1){
     return(list(sigma, bar_u))
 }
 
-apply_activate <- function(data, transformer, temperature = .66) {
+apply_activate <- function(data, transformer, temperature = 0.2) {
   DIM <- data$shape[2]
   data_t <- list()
   st <- 1
@@ -368,7 +368,7 @@ apply_activate <- function(data, transformer, temperature = .66) {
       st <- ed + 1
     } else if(item[[2]] == "softmax") {
       ed <- st + item[[1]] - 1
-      transformed <- torch::nnf_gumbel_softmax(data[,st:ed]$cpu(), tau = 0.2)$to(device = device)
+      transformed <- torch::nnf_gumbel_softmax(data[,st:ed]$cpu(), tau = temperature)$to(device = device)
       data_t[[length(data_t)+1]] <- transformed
       st <- ed + 1
     } else {
