@@ -474,7 +474,7 @@ GAN2_update_step <-
     z_ae_loss <- GAN_nets$losses[[2]](z_rec, z_gen)
     mask_ae_loss <- GAN_nets$losses[[4]](mask_rec, real_mask)
 
-    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen)
+    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
     fake_e_score <- GAN_nets$discriminator_e(z_enc)
     if(loss == "wgan_gp"){
       G_loss_d <- -torch::torch_mean(fake_d_score)
