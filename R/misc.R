@@ -11,12 +11,12 @@ tbm_data <-
     data.gen  <- function(DGP, n, w.rand.error = TRUE, mean.vec) {
       X1 <- rgamma(n, 8, 2)
       X2 <- rgamma(n, 10, 1)
-      X3.5 <-  mvrnorm(n, c(2, 3, 6), diag(c(1.5, 0.5, 3.3)))
+      X3.5 <-  MASS::mvrnorm(n, c(2, 3, 6), diag(c(1.5, 0.5, 3.3)))
       X6.8 <-
         t(rmultinom(n, size = 1, prob = c(1 / 3, 1 / 3, 1 / 3)))
       X9.10 <-
-        mvrnorm(n, mu = c(-0.3, 2), Sigma = matrix(c(1.5, 0.685, 0.685, 5.5), 2))
-      X11.40 <- mvrnorm(n, mu = mean.vec, Sigma = diag(30))
+        MASS::mvrnorm(n, mu = c(-0.3, 2), Sigma = matrix(c(1.5, 0.685, 0.685, 5.5), 2))
+      X11.40 <- MASS::mvrnorm(n, mu = mean.vec, Sigma = diag(30))
 
       ### Create outcomes
       Y  <- switch(
