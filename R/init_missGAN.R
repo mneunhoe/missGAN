@@ -502,7 +502,7 @@ GAN2_update_step <-
 
 
 init_missGAN3 <- function(dat, mask, transformer,
-                         latent_dim = 2, IAF = T,
+                         latent_dim = 2, IAF = F,
                          optimizer = "adam",
                          base_lr = 0.001, ttur_d_factor = 1,
                          n_encoder = list(128, 128, 128),
@@ -514,7 +514,8 @@ init_missGAN3 <- function(dat, mask, transformer,
                          alpha = 10,
                          beta = 0.1,
                          gamma = 0.1,
-                         pack = 1) {
+                         pack = 1,
+                         sigmoid_D = T) {
   data_dim <- ncol(dat)
 
   # Now, we can set up a Generator net and send it to our device (cpu or gpu)
@@ -551,14 +552,14 @@ init_missGAN3 <- function(dat, mask, transformer,
   discriminator_d <-
     Discriminator(data_dim = data_dim,
                   hidden_units = ndf,
-                  dropout_rate = D_dropout_rate,pack = pack, sigmoid = T)$to(device = device)
+                  dropout_rate = D_dropout_rate,pack = pack, sigmoid = sigmoid_D)$to(device = device)
 
   discriminator_d$apply(init_weights)
 
   discriminator_e <-
     Discriminator(data_dim = latent_dim,
                   hidden_units = ndf,
-                  dropout_rate = D_dropout_rate, pack = pack, sigmoid = T)$to(device = device)
+                  dropout_rate = D_dropout_rate, pack = pack, sigmoid = sigmoid_D)$to(device = device)
 
   discriminator_e$apply(init_weights)
 
