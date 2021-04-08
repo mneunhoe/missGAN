@@ -160,7 +160,8 @@ Discriminator <- torch::nn_module(
   initialize = function(data_dim, # The number of columns in our data
                         hidden_units = list(128, 128), # A list with the number of neurons per layer. If you add more elements to the list you create a deeper network.
                         dropout_rate = 0.5, # The dropout probability
-                        pack = 1
+                        pack = 1,
+                        sigmoid = FALSE
   ) {
 
     # Initialize an empty nn_sequential module
@@ -191,8 +192,12 @@ Discriminator <- torch::nn_module(
     }
     # Add an output layer to the net. Since it will be one score for each example we only need a dimension of 1.
     self$seq$add_module(module = (torch::nn_linear(dim, 1)),
-                        name = "Output")
-
+                        name = "Logits")
+    
+    if(sigmoid){
+    self$seq$add_module(module = torch::nn_sigmoid(),
+                                            name = "Output")
+     }
   },
   calc_gradient_penalty = function(D,real_data, fake_data, device=device, pac=1, lambda_=10){
         alpha = torch::torch_rand(real_data$size(1), 1, device=device)
