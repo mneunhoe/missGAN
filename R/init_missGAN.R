@@ -499,3 +499,380 @@ GAN2_update_step <-
     return(list(D_loss$item(), G_loss$item()))
   }
 
+
+init_missGAN3 <- function(dat, mask, transformer,
+                         latent_dim = 2, IAF = T,
+                         optimizer = "adam",
+                         base_lr = 0.001, ttur_d_factor = 1,
+                         n_encoder = list(128, 128, 128),
+                         n_decoder = list(128, 128, 128),
+                         ndf = list(128, 128, 128),
+                         encoder_dropout_rate = 0,
+                         decoder_dropout_rate = 0,
+                         D_dropout_rate = 0,
+                         alpha = 10,
+                         beta = 0.1,
+                         gamma = 0.1,
+                         pack = 1) {
+  data_dim <- ncol(dat)
+
+  # Now, we can set up a Generator net and send it to our device (cpu or gpu)
+  encoder <-
+    Encoder(
+      noise_dim = data_dim,
+      data_dim = latent_dim,
+      hidden_units = n_encoder,
+      dropout_rate = encoder_dropout_rate
+    )$to(device = device)
+
+  encoder$apply(init_weights)
+
+  decoder <-
+    Generator(
+      noise_dim = latent_dim,
+      data_dim = data_dim,
+      hidden_units = n_decoder,
+      dropout_rate = decoder_dropout_rate
+    )$to(device = device)
+
+  decoder$apply(init_weights)
+
+  mask_decoder <-
+    Generator(
+      noise_dim = latent_dim,
+      data_dim = data_dim,
+      hidden_units = n_decoder,
+      dropout_rate = decoder_dropout_rate
+    )$to(device = device)
+
+  mask_decoder$apply(init_weights)
+
+  discriminator_d <-
+    Discriminator(data_dim = data_dim,
+                  hidden_units = ndf,
+                  dropout_rate = D_dropout_rate,pack = pack, sigmoid = T)$to(device = device)
+
+  discriminator_d$apply(init_weights)
+
+  discriminator_e <-
+    Discriminator(data_dim = latent_dim,
+                  hidden_units = ndf,
+                  dropout_rate = D_dropout_rate, pack = pack, sigmoid = T)$to(device = device)
+
+  discriminator_e$apply(init_weights)
+
+  # To update the parameters of the network we need setup an optimizer. Here we use the adam optimizer with a learning rate of 0.0002
+  if(optimizer == "adam") {
+    d_optim <- torch::optim_adam(do.call(c, list(discriminator_d$parameters,
+                                                     discriminator_e$parameters)),
+                                     lr = base_lr * ttur_d_factor, betas = c(0.5, 0.9))
+    g_optim <- torch::optim_adam(do.call(c, list(encoder$parameters,
+                                                     decoder$parameters,
+                                                     mask_decoder$parameters)),
+                                     lr = base_lr, betas = c(0.5, 0.9))
+  }
+  if(optimizer == "adamw") {
+    d_optim <- torch::optim_adam(do.call(c, list(discriminator_d$parameters,
+                                                 discriminator_e$parameters)),
+                                 lr = base_lr * ttur_d_factor, weight_decay = 0.1, amsgrad = T)
+    g_optim <- torch::optim_adam(do.call(c, list(encoder$parameters,
+                                                 decoder$parameters,
+                                                 mask_decoder$parameters)),
+                                 lr = base_lr, weight_decay = 0.1, amsgrad = T)
+  }
+
+  criterionCycle <- torch::nn_mse_loss()
+  MSEloss <- torch::nn_mse_loss()
+  criterionCE <- torch::nn_cross_entropy_loss()
+  criterionBCE <- torch::nn_bce_loss()
+
+
+
+  # To observe training we will also create one fixed noise data frame.
+  # # torch_randn creates a torch object filled with draws from a standard normal distribution
+  fixed_z <-
+    torch::torch_randn(c(nrow(dat), latent_dim))$to(device = device)
+
+  return(
+    list(
+      encoder = encoder,
+      decoder = decoder,
+      mask_decoder = mask_decoder,
+      discriminator_d = discriminator_d,
+      discriminator_e = discriminator_e,
+      g_optim = g_optim,
+      d_optim = d_optim,
+      torch_data = dat,
+      torch_mask = mask,
+      transformer = transformer,
+      fixed_z = fixed_z,
+      latent_dim = latent_dim,
+      losses = list(criterionCycle, MSEloss, criterionCE, criterionBCE),
+      g_loss_weights = list(alpha, beta, gamma)
+
+    )
+  )
+
+}
+
+gauss_repara <- function(mu, logvar, n_sample = 1) {
+  std <- logvar$mul(0.5)$exp_()
+  size <- std$size()
+
+  eps <- torch_randn(shape = c(size[1], n_sample, size[2]), requires_grad = T)
+
+  z <- eps$mul(std$reshape(c(size[1], n_sample, size[2])))$add_(mu$reshape(c(size[1], n_sample, size[2])))
+
+  z <- torch_clamp(z, -4, 4)
+
+  return(z$view(list(z$size(1)*z$size(2), z$size(3))))
+
+}
+
+log_prob_gaussian <- function(z, mu, log_var){
+  res <- - 0.5 * log_var - ((z - mu)^2.0 / (2.0 * torch_exp(log_var)))
+res <- res - 0.5 * log(2*pi)
+return(res)
+}
+
+
+
+kld_std_guss <- function(mu, log_var){
+
+kld = -0.5 * torch_sum(log_var + 1. - mu^2 - torch_exp(log_var), dim=2)
+return(kld)
+}
+
+
+
+GAN3_update_step <-
+  function(GAN_nets,
+           loss = "gan",
+           batch_size = 50) {
+    ##########################
+    # Sample Batch of Data
+    ###########################
+
+    # For each training iteration we need a fresh (mini-)batch from our data.
+    # So we first sample random IDs from our data set.
+    batch_idx <-
+      sample(nrow(GAN_nets$torch_data), size = batch_size)
+
+    # Then we subset the data set (x is the torch version of the data) to our fresh batch.
+    real_data <- GAN_nets$torch_data[batch_idx]$to(device = device)
+    real_mask <- GAN_nets$torch_mask[batch_idx]$to(device = device)
+
+    ###########################
+    # Update the Discriminator
+    ###########################
+
+    for(p in GAN_nets$encoder$parameters){
+      p$requires_grad_(F)
+    }
+    for(p in GAN_nets$decoder$parameters){
+      p$requires_grad_(F)
+    }
+    for(p in GAN_nets$mask_decoder$parameters){
+      p$requires_grad_(F)
+    }
+
+    #noise <- torch::torch_randn(real_mask$shape)$to(device = device)
+    #noise <- torch::torch_zeros(real_mask$shape)$to(device = device)
+    #noise$requires_grad <- T
+    #z_enc <- GAN_nets$encoder(real_mask*real_data + (1-real_mask)*noise)
+    c(mu_z_enc, var_z_enc) %<-% GAN_nets$encoder(real_data*real_mask)
+    z_enc <- gauss_repara(mu_z_enc, var_z_enc)
+    #z_gen <- torch::torch_empty_like(z_enc)$cpu()$normal_()$to(device = device)
+    z_gen <- torch::torch_randn_like(z_enc, device = device)
+    
+    x_gen <- apply_activate(GAN_nets$decoder(z_gen), GAN_nets$transformer)
+    #x_rec <- apply_activate(GAN_nets$decoder(z_enc), GAN_nets$transformer)
+
+    fake_mask <- apply_mask_activate(GAN_nets$mask_decoder(z_gen), temperature = 1)
+
+    eps_fake <- torch::torch_rand_like(fake_mask, device = device)
+    fake_mask <- nnf_sigmoid((torch_log(fake_mask) + torch_log(eps_fake) - torch_log(1 - eps_fake))/0.1)
+    
+
+    #mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc), temperature = 1)
+
+    #eps_rec <- torch::torch_rand_like(mask_rec, device = device)
+    #mask_rec <- nnf_sigmoid((torch_log(mask_rec) + torch_log(eps_rec) - torch_log(1 - eps_rec))/0.1)
+
+    
+    if(loss == "wgan_gp"){
+      
+      real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
+      fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
+    
+      pen_d <- GAN_nets$discriminator_d$calc_gradient_penalty(GAN_nets$discriminator_d,
+                        real_mask*real_data + (1-real_mask)*noise, fake_mask*x_gen + (1-fake_mask)*noise, device = device)
+      loss_d <- -(torch::torch_mean(real_d_score) - torch::torch_mean(fake_d_score))
+    
+      fake_e_score <- GAN_nets$discriminator_e(z_enc)
+      real_e_score <- GAN_nets$discriminator_e(z_gen)
+      
+      pen_e <- GAN_nets$discriminator_e$calc_gradient_penalty(GAN_nets$discriminator_e,
+                        z_gen, z_enc, device = device)
+      loss_e <- -(torch::torch_mean(real_e_score) - torch::torch_mean(fake_e_score))
+      
+      
+      
+    D_loss <-  loss_d*0.5 + loss_e*0.5 + pen_d + pen_e
+    D_loss <- D_loss$mean()
+    D_loss$requires_grad <- T
+
+    GAN_nets$d_optim$zero_grad()
+    D_loss$backward()
+    GAN_nets$d_optim$step()
+      
+      
+    } else if(loss == "gan"){
+
+      real_d_score <- GAN_nets$discriminator_d(real_mask*real_data)
+      fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen)
+      
+      loss_d <- 0.5 * (
+      torch::nnf_binary_cross_entropy(fake_d_score, torch::torch_zeros_like(fake_d_score, device = device)) +
+        torch::nnf_binary_cross_entropy(real_d_score, torch::torch_ones_like(real_d_score, device = device))
+    )
+
+      fake_e_score <- GAN_nets$discriminator_e(z_enc)
+      real_e_score <- GAN_nets$discriminator_e(z_gen)
+      
+      loss_e <- 0.5 * (
+      torch::nnf_binary_cross_entropy(fake_e_score, torch::torch_zeros_like(fake_e_score, device = device)) +
+        torch::nnf_binary_cross_entropy(real_e_score, torch::torch_ones_like(real_e_score, device = device))
+    )
+      
+      
+      
+    D_loss <-  loss_d + loss_e
+    D_loss <- D_loss$mean()
+    D_loss$requires_grad <- T
+
+    GAN_nets$d_optim$zero_grad()
+    D_loss$backward()
+    GAN_nets$d_optim$step()
+
+      } else{
+    real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
+    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
+
+    fake_e_score <- GAN_nets$discriminator_e(z_enc)
+    real_e_score <- GAN_nets$discriminator_e(z_gen)
+
+    loss_d_real <- kl_real(real_d_score)
+    loss_d_fake <- kl_fake(fake_d_score)
+
+    loss_e_real <- kl_real(real_e_score)
+    loss_e_fake <- kl_fake(fake_e_score)
+    
+    loss_d <- (loss_d_real + loss_d_fake)*0.5
+    loss_e <- (loss_e_real + loss_e_fake)*0.5
+    D_loss <-  loss_d + loss_e
+    D_loss <- D_loss$mean()
+    D_loss$requires_grad <- T
+
+    GAN_nets$d_optim$zero_grad()
+    D_loss$backward()
+    GAN_nets$d_optim$step()
+}
+    ###########################
+    # Update the Generator
+    ###########################
+    for(p in GAN_nets$encoder$parameters){
+      p$requires_grad_(T)
+    }
+    for(p in GAN_nets$decoder$parameters){
+      p$requires_grad_(T)
+    }
+    for(p in GAN_nets$mask_decoder$parameters){
+      p$requires_grad_(T)
+    }
+    for(p in GAN_nets$discriminator_d$parameters){
+      p$requires_grad_(F)
+    }
+    for(p in GAN_nets$discriminator_e$parameters){
+      p$requires_grad_(F)
+    }
+
+    c(mu_z_enc, var_z_enc) %<-% GAN_nets$encoder(real_data*real_mask)
+    z_enc <- gauss_repara(mu_z_enc, var_z_enc)
+    #z_gen <- torch::torch_empty_like(z_enc)$cpu()$normal_()$to(device = device)
+    z_gen <- torch::torch_randn_like(z_enc, device = device)
+    
+    x_gen <- apply_activate(GAN_nets$decoder(z_gen), GAN_nets$transformer)
+    x_rec <- apply_activate(GAN_nets$decoder(z_enc), GAN_nets$transformer)
+
+    fake_mask <- apply_mask_activate(GAN_nets$mask_decoder(z_gen), temperature = 1)
+
+    eps_fake <- torch::torch_rand_like(fake_mask, device = device)
+    fake_mask <- nnf_sigmoid((torch_log(fake_mask) + torch_log(eps_fake) - torch_log(1 - eps_fake))/0.1)
+    
+
+    mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc), temperature = 1)
+
+    eps_rec <- torch::torch_rand_like(mask_rec, device = device)
+    mask_rec <- nnf_sigmoid((torch_log(mask_rec) + torch_log(eps_rec) - torch_log(1 - eps_rec))/0.1)
+
+    c(mu_z_rec, var_z_rec) %<-% GAN_nets$encoder(fake_mask*x_gen)
+    z_rec <- gauss_repara(mu_z_rec, var_z_rec)
+
+    start_idx <- 1
+    ae_loss <- torch::torch_zeros(1, requires_grad = T)$to(device = device)
+
+    for(info in GAN_nets$transformer$output_info){
+      i <- info[[1]]
+      if(info[[2]] == "linear" | info[[2]] == "tanh") {
+        ae_loss <- ae_loss + GAN_nets$losses[[1]](x_rec[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1],
+                                                  real_data[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1])
+      } else if(info[[2]] == "softmax") {
+        ae_loss <- ae_loss + GAN_nets$losses[[3]](x_rec[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1]$view(c(-1, i)),
+                                                  torch::torch_argmax(real_data[,start_idx:(start_idx+i-1)][real_mask[,start_idx:(start_idx+i-1)]==1]$view(c(-1, i)), dim = 2))
+      } else {
+        ae_loss <- ae_loss + GAN_nets$losses[[4]](x_rec[,start_idx:(start_idx+i-1)],
+                                                  real_data[,start_idx:(start_idx+i-1)])
+      }
+      start_idx <- start_idx + i
+    }
+
+    #z_ae_loss <- GAN_nets$losses[[2]](z_rec, z_gen)
+
+  log_prob_z <- log_prob_gaussian(z_gen,
+                                  mu_z_rec, 
+                                  var_z_rec)
+  
+  z_ae_loss <- -1.0 * log_prob_z$mean(2)$mean(1)
+
+  mask_ae_loss <- GAN_nets$losses[[4]](mask_rec, real_mask)
+
+    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen)
+    fake_e_score <- GAN_nets$discriminator_e(z_enc)
+    if(loss == "wgan_gp"){
+      G_loss_d <- -torch::torch_mean(fake_d_score)
+      G_loss_e <- -torch::torch_mean(fake_e_score)
+   } else if(loss == "gan"){
+    G_loss_d <- torch::nnf_binary_cross_entropy(fake_d_score, torch::torch_ones_like(fake_d_score, device = device))
+      G_loss_e <- torch::nnf_binary_cross_entropy(fake_e_score, torch::torch_ones_like(fake_e_score, device = device))
+    } else{
+    G_loss_d <- kl_gen(fake_d_score)
+    G_loss_e <- kl_gen(fake_e_score)
+}
+    G_loss1 <- G_loss_d + G_loss_e
+    G_loss <- G_loss1 + GAN_nets$g_loss_weights[[1]] * ae_loss + GAN_nets$g_loss_weights[[2]] * z_ae_loss + GAN_nets$g_loss_weights[[3]] * mask_ae_loss
+
+    GAN_nets$g_optim$zero_grad()
+    G_loss$backward()
+    GAN_nets$g_optim$step()
+
+    cat("Discriminator loss: ",
+        D_loss$item(),
+        "\t Generator loss: ",
+        G_loss$item(),
+        "\n")
+    
+    return(list(D_loss$item(), G_loss$item()))
+  }
+
+
