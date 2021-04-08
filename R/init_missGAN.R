@@ -620,18 +620,18 @@ gauss_repara <- function(mu, logvar, n_sample = 1) {
   std <- logvar$mul(0.5)$exp_()
   size <- std$size()
 
-  eps <- torch_randn(shape = c(size[1], n_sample, size[2]), requires_grad = T)
+  eps <- torch::torch_randn(shape = c(size[1], n_sample, size[2]), requires_grad = T, device = device)
 
   z <- eps$mul(std$reshape(c(size[1], n_sample, size[2])))$add_(mu$reshape(c(size[1], n_sample, size[2])))
 
-  z <- torch_clamp(z, -4, 4)
+  z <- torch::torch_clamp(z, -4, 4)
 
   return(z$view(list(z$size(1)*z$size(2), z$size(3))))
 
 }
 
 log_prob_gaussian <- function(z, mu, log_var){
-  res <- - 0.5 * log_var - ((z - mu)^2.0 / (2.0 * torch_exp(log_var)))
+  res <- - 0.5 * log_var - ((z - mu)^2.0 / (2.0 * torch::torch_exp(log_var)))
 res <- res - 0.5 * log(2*pi)
 return(res)
 }
@@ -640,7 +640,7 @@ return(res)
 
 kld_std_guss <- function(mu, log_var){
 
-kld = -0.5 * torch_sum(log_var + 1. - mu^2 - torch_exp(log_var), dim=2)
+kld = -0.5 * torch::torch_sum(log_var + 1. - mu^2 - torch::torch_exp(log_var), dim=2)
 return(kld)
 }
 
@@ -692,7 +692,7 @@ GAN3_update_step <-
     fake_mask <- apply_mask_activate(GAN_nets$mask_decoder(z_gen), temperature = 1)
 
     eps_fake <- torch::torch_rand_like(fake_mask, device = device)
-    fake_mask <- nnf_sigmoid((torch_log(fake_mask) + torch_log(eps_fake) - torch_log(1 - eps_fake))/0.1)
+    fake_mask <- torch::nnf_sigmoid((torch::torch_log(fake_mask) + torch::torch_log(eps_fake) - torch::torch_log(1 - eps_fake))/0.1)
     
 
     #mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc), temperature = 1)
@@ -809,13 +809,13 @@ GAN3_update_step <-
     fake_mask <- apply_mask_activate(GAN_nets$mask_decoder(z_gen), temperature = 1)
 
     eps_fake <- torch::torch_rand_like(fake_mask, device = device)
-    fake_mask <- nnf_sigmoid((torch_log(fake_mask) + torch_log(eps_fake) - torch_log(1 - eps_fake))/0.1)
+    fake_mask <- torch::nnf_sigmoid((torch::torch_log(fake_mask) + torch::torch_log(eps_fake) - torch::torch_log(1 - eps_fake))/0.1)
     
 
     mask_rec <- apply_mask_activate(GAN_nets$mask_decoder(z_enc), temperature = 1)
 
     eps_rec <- torch::torch_rand_like(mask_rec, device = device)
-    mask_rec <- nnf_sigmoid((torch_log(mask_rec) + torch_log(eps_rec) - torch_log(1 - eps_rec))/0.1)
+    mask_rec <- torch::nnf_sigmoid((torch::torch_log(mask_rec) + torch::torch_log(eps_rec) - torch::torch_log(1 - eps_rec))/0.1)
 
     c(mu_z_rec, var_z_rec) %<-% GAN_nets$encoder(fake_mask*x_gen)
     z_rec <- gauss_repara(mu_z_rec, var_z_rec)
