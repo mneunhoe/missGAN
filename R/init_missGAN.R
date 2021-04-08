@@ -625,7 +625,7 @@ gauss_repara <- function(mu, logvar, n_sample = 1) {
 
   z <- eps$mul(std$reshape(c(size[1], n_sample, size[2])))$add_(mu$reshape(c(size[1], n_sample, size[2])))
 
-  z <- torch::torch_clamp(z, -6, 6)
+  #z <- torch::torch_clamp(z, -6, 6)
 
   return(z$view(list(z$size(1)*z$size(2), z$size(3))))
 
