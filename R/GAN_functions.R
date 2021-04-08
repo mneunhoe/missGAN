@@ -492,22 +492,22 @@ sample_g_output <-
     dim <- data$shape[2]
     data <- data * mask
     torch::with_no_grad({
-      encoded_data <- encoder(data$to(device = device))
+      c(mu_z_enc, var_z_enc) %<-% encoder(data$to(device = device))
+      encoded_data <- gauss_repara(mu_z_enc, var_z_enc)
       decoded_data <-
         apply_activate(decoder(encoded_data), transformer)$detach()$cpu()
     })
     synth_data <- data * mask + (1 - mask) * decoded_data
     synth_data <- torch::as_array(synth_data$detach()$cpu())
     synth_data <- transformer$inverse_transform(synth_data)
-
+    
     decoded_data <-
       transformer$inverse_transform(torch::as_array(decoded_data$detach()$cpu()))
-
+    
     return(list(encoded_data = torch::as_array(encoded_data$detach()$cpu()),
                 imputed_data = synth_data,
                 synthetic_data = decoded_data))
-  }                
-
+  }         
 
 
 
