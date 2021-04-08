@@ -1,3 +1,4 @@
+require(zeallot)
 # We need to pass our noise_dim and data_dim to create concrete networks
 init_missGAN <- function(dat,
                          noise_dim = 2) {
