@@ -703,11 +703,11 @@ GAN3_update_step <-
     
     if(loss == "wgan_gp"){
       
-      real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
-      fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
+      real_d_score <- GAN_nets$discriminator_d(real_mask*real_data)
+      fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen )
     
       pen_d <- GAN_nets$discriminator_d$calc_gradient_penalty(GAN_nets$discriminator_d,
-                        real_mask*real_data + (1-real_mask)*noise, fake_mask*x_gen + (1-fake_mask)*noise, device = device)
+                        real_mask*real_data, fake_mask*x_gen, device = device)
       loss_d <- -(torch::torch_mean(real_d_score) - torch::torch_mean(fake_d_score))
     
       fake_e_score <- GAN_nets$discriminator_e(z_enc)
@@ -757,8 +757,8 @@ GAN3_update_step <-
     GAN_nets$d_optim$step()
 
       } else{
-    real_d_score <- GAN_nets$discriminator_d(real_mask*real_data + (1-real_mask)*noise)
-    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen + (1-fake_mask)*noise)
+    real_d_score <- GAN_nets$discriminator_d(real_mask*real_data)
+    fake_d_score <- GAN_nets$discriminator_d(fake_mask*x_gen)
 
     fake_e_score <- GAN_nets$discriminator_e(z_enc)
     real_e_score <- GAN_nets$discriminator_e(z_gen)
